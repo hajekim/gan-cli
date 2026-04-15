@@ -68,21 +68,22 @@ pip install -r requirements.txt
 **MCP 서버 목록에 항목 추가:**
 
 ```
-- **claude-generator**: GAN 루프 코드 생성 전용. `claude_generate(task, contract, feedback)`으로
-  Claude 4.6 Sonnet (Vertex AI)에게 구현을 위임한다.
-  `save_artifact(content, filename)`, `save_progress(sprint_id, status, grade)`로 결과를 저장한다.
+- **claude-generator**: Code generation via GAN loop. Use `claude_generate(task, contract, feedback)`
+  to delegate implementation to Claude 4.6 Sonnet (Vertex AI).
+  Also provides `save_artifact(content, filename)` and `save_progress(sprint_id, status, grade)`.
 ```
 
 **실행 워크플로우(ACT 단계 또는 GAN 루프 섹션)에 추가:**
 
 ```
-코드 생성이 필요한 경우, 직접 작성하지 않고 claude-generator MCP에 위임한다:
-1. 작업 요구사항을 분석하여 Sprint Contract(JSON DoD)를 직접 작성한다.
-2. claude_generate(task, contract, feedback="")를 호출하여 Claude의 구현을 받는다.
-3. 반환된 코드를 Skeptical Judge로서 엄격하게 평가한다 (Gemini = Evaluator).
-4. Grade B/C이면 구체적인 피드백으로 claude_generate를 재호출한다. 최대 3회.
-5. Grade A 달성 시 save_artifact와 save_progress로 결과를 저장한다.
-코드 생성이 아닌 작업(기존 코드 수정, 설정 변경 등)은 직접 처리한다.
+For code generation tasks, delegate to Claude via the claude-generator MCP instead of
+writing code directly:
+1. Write a Sprint Contract (JSON DoD) based on the task.
+2. Call claude_generate(task, contract, feedback="") to get Claude's implementation.
+3. Evaluate the result as the Skeptical Judge (Gemini = Evaluator).
+4. If Grade B/C, call claude_generate again with specific feedback. Repeat up to 3 times.
+5. On Grade A, call save_artifact and save_progress to persist the result.
+For non-generation tasks (surgical patches, config changes), implement directly.
 ```
 
 ## 사용 방법
