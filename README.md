@@ -86,21 +86,48 @@ For non-generation tasks (surgical patches, config changes), implement directly.
 
 ## Usage
 
-Restart Gemini CLI, then describe your task naturally. The GAN loop activates based on GEMINI.md instructions:
+Restart Gemini CLI, then describe your task naturally:
 
 ```
-Python으로 가위바위보 게임을 만들어줘. 점수 기록 기능도 포함해줘.
+Implement a Python calculator with add, subtract, multiply, divide and unit tests using the GAN loop.
 ```
 
+### Example Session
+
+**Planning phase** — Gemini drafts a Sprint Contract and asks for approval:
+
 ```
-Implement a FastAPI server with JWT authentication and input validation.
+✦ I've created a development plan (PLAN.md) for a Python calculator with full unit test
+  coverage. Using the GAN loop (Gemini as Evaluator, Claude as Generator) to ensure
+  PEP 8 compliance and complete test coverage.
+
+  Shall I break this into sprint tasks (DEFINE.md) and begin implementation?
+
+  PLAN.md Summary:
+   - Goal: Python calculator module with four operations and pytest unit tests.
+   - Strategy: Generate code via Claude 4.6 Sonnet (claude_generate), validated by Gemini.
+   - Verification Contract: All four operations correct, ZeroDivisionError handled,
+     PEP 8 compliant, tests passing.
+   - Grade Target: Grade A — complete functionality and clean style.
 ```
 
-Gemini will:
-1. Write a Sprint Contract (Definition of Done) using its own reasoning
-2. Call `claude_generate` to get an implementation from Claude
-3. Evaluate the result strictly against the contract
-4. Iterate with actionable feedback until Grade A is achieved
+**Implementation phase** — after approval, the GAN loop runs and delivers:
+
+```
+✦ The GAN loop (Claude Generator + Gemini Evaluator) has completed a high-quality
+  Python calculator. All four operations are implemented with full pytest coverage.
+
+  Output: calculator.py + tests/test_calculator.py
+   - Features:
+       - add(), subtract(), multiply(), divide() with correct return types.
+       - ZeroDivisionError handled gracefully in divide().
+       - 8 unit tests covering all operations and edge cases.
+       - PEP 8 compliant throughout.
+
+  GAN Loop Results:
+   - Generator (Claude 4.6 Sonnet): Clean, well-documented module with clear signatures.
+   - Evaluator (Gemini): Verified edge-case handling, test coverage, and style — Grade A.
+```
 
 ### Outputs
 
@@ -115,7 +142,7 @@ These tools are registered globally and available in all Gemini CLI sessions:
 
 | Tool | Description |
 |------|-------------|
-| `claude_generate(task, contract, feedback)` | Calls Claude 4.6 Sonnet (Vertex AI) to generate or refine code |
+| `claude_generate(task, contract, feedback="")` | Calls Claude 4.6 Sonnet (Vertex AI) to generate or refine code |
 | `save_artifact(content, filename)` | Saves output to `artifacts/` directory |
 | `load_progress()` | Reads current sprint state from `state/progress.json` |
 | `save_progress(sprint_id, status, grade)` | Persists sprint state |
@@ -125,17 +152,16 @@ These tools are registered globally and available in all Gemini CLI sessions:
 ```
 claude-gan/
 ├── src/
-│   ├── mcp_server.py        # FastMCP server (stdio transport)
-│   ├── tools/
-│   │   └── claude_tool.py   # Claude Vertex AI call logic
-│   └── config.py            # Environment config
+│   ├── mcp_server.py                # FastMCP server (stdio transport)
+│   └── tools/
+│       └── claude_tool.py           # Claude Vertex AI call logic
 ├── tests/
-│   └── test_claude_tool.py  # Unit tests
+│   └── test_claude_tool.py          # Unit tests
 ├── state/
-│   └── progress.json        # Sprint state persistence
-├── artifacts/               # Generated code outputs
-├── GEMINI.md                # Evaluator instructions for Gemini CLI
-├── gemini-extension.json    # Extension manifest (optional)
+│   └── progress.json                # Sprint state (runtime, gitignored)
+├── artifacts/                       # Generated code outputs (runtime, gitignored)
+├── GEMINI.md                        # Evaluator instructions for Gemini CLI
+├── gemini-extension.json.template   # Extension manifest template (copy and fill in paths)
 └── requirements.txt
 ```
 

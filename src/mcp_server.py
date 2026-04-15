@@ -42,9 +42,9 @@ def save_artifact(content: str, filename: str) -> str:
     Returns:
         Absolute path of the saved file.
     """
-    # Guard against path traversal: filename must be a plain name with no directory components.
+    # Guard against path traversal and null bytes.
     safe_name = Path(filename).name
-    if safe_name != filename or not safe_name:
+    if "\x00" in filename or safe_name != filename or not safe_name:
         raise ValueError(f"Invalid filename '{filename}': must be a plain file name with no path separators.")
 
     _ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ def load_progress() -> str:
     """
     try:
         return json.dumps(json.loads(_STATE_FILE.read_text(encoding="utf-8")), ensure_ascii=False)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return "{}"
 
 
