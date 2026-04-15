@@ -61,15 +61,29 @@ pip install -r requirements.txt
 
 > **참고:** `python3` 경로는 `which python3`로 확인할 수 있습니다.
 
-### 4. Evaluator 컨텍스트 로드
+### 4. 기존 GEMINI.md에 GAN 지시문 추가
 
-Evaluator 지시문을 Gemini CLI 전역 컨텍스트로 복사합니다:
+`~/.gemini/GEMINI.md` 파일을 **덮어쓰지 말고**, 아래 두 항목을 기존 내용의 적절한 위치에 추가합니다.
 
-```bash
-cp GEMINI.md ~/.gemini/GEMINI.md
+**MCP 서버 목록에 항목 추가:**
+
+```
+- **claude-generator**: GAN 루프 코드 생성 전용. `claude_generate(task, contract, feedback)`으로
+  Claude 4.6 Sonnet (Vertex AI)에게 구현을 위임한다.
+  `save_artifact(content, filename)`, `save_progress(sprint_id, status, grade)`로 결과를 저장한다.
 ```
 
-또는, 프로젝트 디렉토리 안에서 Gemini CLI를 실행하면 `GEMINI.md`가 자동으로 로드됩니다.
+**실행 워크플로우(ACT 단계 또는 GAN 루프 섹션)에 추가:**
+
+```
+코드 생성이 필요한 경우, 직접 작성하지 않고 claude-generator MCP에 위임한다:
+1. 작업 요구사항을 분석하여 Sprint Contract(JSON DoD)를 직접 작성한다.
+2. claude_generate(task, contract, feedback="")를 호출하여 Claude의 구현을 받는다.
+3. 반환된 코드를 Skeptical Judge로서 엄격하게 평가한다 (Gemini = Evaluator).
+4. Grade B/C이면 구체적인 피드백으로 claude_generate를 재호출한다. 최대 3회.
+5. Grade A 달성 시 save_artifact와 save_progress로 결과를 저장한다.
+코드 생성이 아닌 작업(기존 코드 수정, 설정 변경 등)은 직접 처리한다.
+```
 
 ## 사용 방법
 

@@ -58,15 +58,30 @@ Add the following entry to `~/.gemini/settings.json` under `mcpServers`:
 
 Replace `/absolute/path/to/claude-gan` with the actual path where you cloned the repository.
 
-### 4. Load the Evaluator Context
+### 4. Add GAN Instructions to Your GEMINI.md
 
-Copy the Evaluator instructions to your Gemini CLI global context:
+Add the following two snippets to your existing `~/.gemini/GEMINI.md`. Do **not** overwrite the file — append to the relevant sections instead.
 
-```bash
-cp GEMINI.md ~/.gemini/GEMINI.md
+**In your MCP Servers list**, add one entry:
+
+```
+- **claude-generator**: Code generation via GAN loop. Use `claude_generate(task, contract, feedback)`
+  to delegate implementation to Claude 4.6 Sonnet (Vertex AI).
+  Also provides `save_artifact(content, filename)` and `save_progress(sprint_id, status, grade)`.
 ```
 
-Or, to keep the context scoped to this project only, run Gemini CLI from within the project directory — `GEMINI.md` is automatically loaded from the current directory.
+**In your execution workflow** (e.g. inside an ACT or GAN-Inspired Loop section), add:
+
+```
+For code generation tasks, delegate to Claude via the claude-generator MCP instead of
+writing code directly:
+1. Write a Sprint Contract (JSON DoD) based on the task.
+2. Call claude_generate(task, contract, feedback="") to get Claude's implementation.
+3. Evaluate the result as the Skeptical Judge (Gemini = Evaluator).
+4. If Grade B/C, call claude_generate again with specific feedback. Repeat up to 3 times.
+5. On Grade A, call save_artifact and save_progress to persist the result.
+For non-generation tasks (surgical patches, config changes), implement directly.
+```
 
 ## Usage
 
