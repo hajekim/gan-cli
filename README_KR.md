@@ -27,7 +27,7 @@ Gemini CLI의 Gemini 모델 자체가 Evaluator입니다. Claude는 서브프로
 ### 1. 리포지토리 클론
 
 ```bash
-git clone https://github.com/your-repo/claude-gan.git
+git clone https://github.com/hajekim/claude-gan.git
 cd claude-gan
 ```
 
