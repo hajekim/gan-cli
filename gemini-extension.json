@@ -1,0 +1,13 @@
+{
+  "name": "claude-gan",
+  "version": "1.0.0",
+  "description": "Gemini 3.1 & Claude 4.6 GAN-inspired Improvement Loop",
+  "author": "gemini-cli",
+  "contextFileName": "GEMINI.md",
+  "commands": {
+    "gan": {
+      "description": "Run the Gemini-Claude GAN loop for high-quality implementation.",
+      "prompt": "Run the GAN loop using the local main.py: !{python3 ${extensionPath}/main.py \"{{args}}\"}"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Project specific
+state/progress.json
+artifacts/
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.gemini/
+.agent/
+
+# Internal Development Tracking (Gemini-Kit / Antigravity)
+CONTEXT.md
+ACTION.md
+PLAN.md
+DEFINE.md
