@@ -44,7 +44,7 @@ Add the following entry to `~/.gemini/settings.json` under `mcpServers`:
 ```json
 {
   "mcpServers": {
-    "claude-generator": {
+    "claude-gan": {
       "command": "/path/to/python3",
       "args": ["/absolute/path/to/claude-gan/src/mcp_server.py"],
       "env": {
@@ -66,7 +66,7 @@ Add the following two snippets to your existing `~/.gemini/GEMINI.md`. Do **not*
 **In your MCP Servers list**, add one entry:
 
 ```
-- **claude-generator**: Code generation via GAN loop. Use `claude_generate(task, contract, feedback)`
+- **claude-gan**: Code generation via GAN loop. Use `claude_generate(task, contract, feedback)`
   to delegate implementation to Claude 4.6 Sonnet (Vertex AI).
   Also provides `save_artifact(content, filename)` and `save_progress(sprint_id, status, grade)`.
 ```
@@ -74,7 +74,7 @@ Add the following two snippets to your existing `~/.gemini/GEMINI.md`. Do **not*
 **In your execution workflow** (e.g. inside an ACT or GAN-Inspired Loop section), add:
 
 ```
-For code generation tasks, delegate to Claude via the claude-generator MCP instead of
+For code generation tasks, delegate to Claude via the claude-gan MCP instead of
 writing code directly:
 1. Write a Sprint Contract (JSON DoD) based on the task.
 2. Call claude_generate(task, contract, feedback="") to get Claude's implementation.
