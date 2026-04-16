@@ -1,6 +1,14 @@
 import json
 import os
+
+import anthropic
 from anthropic import AnthropicVertex
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 MODEL_ID: str = os.getenv("CLAUDE_MODEL_ID", "claude-sonnet-4-6")
 MAX_TOKENS: int = int(os.getenv("CLAUDE_MAX_TOKENS", "8192"))
@@ -18,7 +26,20 @@ def create_client() -> AnthropicVertex:
     return AnthropicVertex(region=region, project_id=project_id)
 
 
-def generate(task: str, contract: str, feedback: str = "") -> str:
+@retry(
+    retry=retry_if_exception_type(
+        (anthropic.APIStatusError, anthropic.APIConnectionError)
+    ),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    reraise=True,
+)
+def _call_api(client: AnthropicVertex, **kwargs):
+    """Vertex AI API 호출. rate limit·네트워크 오류 시 최대 3회 지수 백오프 재시도."""
+    return client.messages.create(**kwargs)
+
+
+def generate(task: str, contract: str, feedback: str = "") -> dict:
     """Claude Vertex AI를 호출하여 코드를 생성하거나 개선한다.
 
     Args:
@@ -27,7 +48,17 @@ def generate(task: str, contract: str, feedback: str = "") -> str:
         feedback: Evaluator의 이전 피드백 (최초 호출 시 빈 문자열)
 
     Returns:
-        Claude가 생성한 코드 문자열. 응답이 잘린 경우 WARNING 접미사 포함.
+        dict: {
+            "text": 생성된 코드 문자열,
+            "input_tokens": 입력 토큰 수,
+            "output_tokens": 출력 토큰 수,
+            "truncated": max_tokens 도달 여부,
+        }
+
+    Raises:
+        ValueError: contract가 유효한 JSON이 아닐 때
+        anthropic.APIStatusError: 재시도 후에도 API 오류가 지속될 때
+        anthropic.APIConnectionError: 재시도 후에도 네트워크 오류가 지속될 때
     """
     try:
         json.loads(contract)
@@ -37,16 +68,20 @@ def generate(task: str, contract: str, feedback: str = "") -> str:
     client = create_client()
     prompt = _build_prompt(task, contract, feedback)
 
-    message = client.messages.create(
+    message = _call_api(
+        client,
         model=MODEL_ID,
         max_tokens=MAX_TOKENS,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = _extract_text(message.content)
-    if message.stop_reason == "max_tokens":
-        text += "\n\n# WARNING: Response was truncated due to max_tokens limit."
-    return text
+
+    return {
+        "text": _extract_text(message.content),
+        "input_tokens": message.usage.input_tokens,
+        "output_tokens": message.usage.output_tokens,
+        "truncated": message.stop_reason == "max_tokens",
+    }
 
 
 def _extract_text(content: list) -> str:

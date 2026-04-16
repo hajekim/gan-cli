@@ -1,3 +1,4 @@
+import anthropic
 import pytest
 from unittest.mock import MagicMock, patch
 from src.tools import claude_tool
@@ -6,10 +7,12 @@ from src.tools import claude_tool
 VALID_CONTRACT = '{"dod": ["print hello"]}'
 
 
-def _make_mock_message(text: str, stop_reason: str = "end_turn") -> MagicMock:
+def _make_mock_message(text: str, stop_reason: str = "end_turn",
+                       input_tokens: int = 10, output_tokens: int = 20) -> MagicMock:
     msg = MagicMock()
     msg.content = [MagicMock(text=text)]
     msg.stop_reason = stop_reason
+    msg.usage = MagicMock(input_tokens=input_tokens, output_tokens=output_tokens)
     return msg
 
 
@@ -20,11 +23,9 @@ def test_generate_initial_call_builds_correct_prompt():
         mock_client.messages.create.return_value = _make_mock_message("generated code")
         mock_create_client.return_value = mock_client
 
-        from src.tools.claude_tool import generate
+        result = claude_tool.generate(task="Write hello world", contract=VALID_CONTRACT)
 
-        result = generate(task="Write hello world", contract=VALID_CONTRACT)
-
-    assert result == "generated code"
+    assert result["text"] == "generated code"
     call_kwargs = mock_client.messages.create.call_args.kwargs
     messages = call_kwargs["messages"]
     assert len(messages) == 1
@@ -39,15 +40,13 @@ def test_generate_refinement_call_includes_feedback():
         mock_client.messages.create.return_value = _make_mock_message("refined code")
         mock_create_client.return_value = mock_client
 
-        from src.tools.claude_tool import generate
-
-        result = generate(
+        result = claude_tool.generate(
             task="Write hello world",
             contract=VALID_CONTRACT,
             feedback="Add error handling",
         )
 
-    assert result == "refined code"
+    assert result["text"] == "refined code"
     call_kwargs = mock_client.messages.create.call_args.kwargs
     messages = call_kwargs["messages"]
     assert "Previous Feedback" in messages[0]["content"]
@@ -76,8 +75,24 @@ def test_create_client_requires_project_id(monkeypatch):
         claude_tool.create_client()
 
 
-def test_truncated_response_adds_warning():
-    """stop_reason이 max_tokens이면 WARNING 접미사가 붙는다."""
+def test_generate_returns_usage_fields():
+    """generate()가 input_tokens, output_tokens, truncated 필드를 반환한다."""
+    with patch("src.tools.claude_tool.create_client") as mock_create_client:
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = _make_mock_message(
+            "code", input_tokens=42, output_tokens=99
+        )
+        mock_create_client.return_value = mock_client
+
+        result = claude_tool.generate(task="t", contract=VALID_CONTRACT)
+
+    assert result["input_tokens"] == 42
+    assert result["output_tokens"] == 99
+    assert result["truncated"] is False
+
+
+def test_truncated_response_sets_truncated_true():
+    """stop_reason이 max_tokens이면 result['truncated']가 True다."""
     with patch("src.tools.claude_tool.create_client") as mock_create_client:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = _make_mock_message(
@@ -87,9 +102,8 @@ def test_truncated_response_adds_warning():
 
         result = claude_tool.generate(task="t", contract=VALID_CONTRACT)
 
-    assert "partial code" in result
-    assert "WARNING" in result
-    assert "max_tokens" in result
+    assert result["truncated"] is True
+    assert result["text"] == "partial code"
 
 
 def test_multiple_text_blocks_joined():
@@ -99,6 +113,7 @@ def test_multiple_text_blocks_joined():
     msg = MagicMock()
     msg.content = [block1, block2]
     msg.stop_reason = "end_turn"
+    msg.usage = MagicMock(input_tokens=5, output_tokens=5)
 
     with patch("src.tools.claude_tool.create_client") as mock_create_client:
         mock_client = MagicMock()
@@ -107,7 +122,7 @@ def test_multiple_text_blocks_joined():
 
         result = claude_tool.generate(task="t", contract=VALID_CONTRACT)
 
-    assert result == "part1part2"
+    assert result["text"] == "part1part2"
 
 
 def test_non_text_block_raises_value_error():
@@ -116,6 +131,7 @@ def test_non_text_block_raises_value_error():
     msg = MagicMock()
     msg.content = [tool_use_block]
     msg.stop_reason = "end_turn"
+    msg.usage = MagicMock(input_tokens=5, output_tokens=0)
 
     with patch("src.tools.claude_tool.create_client") as mock_create_client:
         mock_client = MagicMock()
@@ -134,16 +150,31 @@ def test_invalid_contract_raises_value_error():
 
 def test_max_tokens_env_override(monkeypatch):
     """CLAUDE_MAX_TOKENS 환경변수가 max_tokens로 전달된다."""
-    monkeypatch.setenv("CLAUDE_MAX_TOKENS", "1024")
-
     with patch("src.tools.claude_tool.create_client") as mock_create_client:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = _make_mock_message("code")
         mock_create_client.return_value = mock_client
 
-        # 모듈 재로드 없이 현재 MAX_TOKENS 값을 직접 패치
         with patch.object(claude_tool, "MAX_TOKENS", 1024):
             claude_tool.generate(task="t", contract=VALID_CONTRACT)
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
     assert call_kwargs["max_tokens"] == 1024
+
+
+def test_api_error_retries_and_raises():
+    """APIStatusError 발생 시 재시도 후 최종적으로 예외를 전파한다."""
+    with patch("src.tools.claude_tool.create_client") as mock_create_client:
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = anthropic.APIStatusError(
+            "rate limit", response=MagicMock(status_code=429), body={}
+        )
+        mock_create_client.return_value = mock_client
+
+        # tenacity sleep을 패치하여 재시도 대기 시간 제거
+        with patch("tenacity.nap.time.sleep"):
+            with pytest.raises(anthropic.APIStatusError):
+                claude_tool.generate(task="t", contract=VALID_CONTRACT)
+
+    # 3회 재시도 확인
+    assert mock_client.messages.create.call_count == 3
